@@ -216,7 +216,7 @@ func EvaluateSuitability(a *WorkbookAssessment) SuitabilityRecommendation {
 		rec.AssuranceLevel,
 		strings.Join(rec.AssuranceCriteria, ", "),
 		rec.AssuranceClassification,
-		rec.RiskClassification,
+		strings.ToLower(rec.RiskClassification),
 		strings.ToLower(rec.AssuranceClassification),
 		rec.RecommendedOutcome,
 	)
