@@ -21,6 +21,7 @@ type Assessment struct {
 	Approver          string `json:"approver"`
 	AssessmentDate    string `json:"assessmentDate"`
 	Outcome           string `json:"outcome"`
+	OverrideRationale string `json:"overrideRationale"`
 	DecisionRationale string `json:"decisionRationale"`
 	RequiredControls  string `json:"requiredControls"`
 }
@@ -75,6 +76,7 @@ func Generate(a *assessment.WorkbookAssessment) Attestation {
 			Approver:          a.Approver,
 			AssessmentDate:    a.AssessmentDate,
 			Outcome:           a.Outcome,
+			OverrideRationale: a.OverrideRationale,
 			DecisionRationale: a.DecisionRationale,
 			RequiredControls:  a.RequiredControls,
 		},

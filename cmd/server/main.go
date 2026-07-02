@@ -36,10 +36,32 @@ type errorResult struct {
 	Errors []string
 }
 
+type matrixResult struct {
+	Recommendation        assessment.SuitabilityRecommendation
+	OverrideRationale     string
+	AssuranceHeadings     []string
+	Rows                  []matrixRow
+	RecommendedOutcomeTag string
+	SelectedOutcomeTag    string
+}
+
+type matrixRow struct {
+	Key   string
+	Label string
+	Cells []matrixCell
+}
+
+type matrixCell struct {
+	Key     string
+	Outcome string
+	Active  bool
+}
+
 var (
 	workbookTmpl *template.Template
 	downloadTmpl *template.Template
 	errTmpl      *template.Template
+	matrixTmpl   *template.Template
 )
 
 // downloadTemplate is returned on successful attestation generation. The
@@ -75,6 +97,76 @@ const errorTemplate = `<div class="result result--error">
   </ul>
 </div>`
 
+const matrixTemplate = `<div id="suitability-matrix"
+  class="matrix-panel"
+  hx-post="/suitability-matrix"
+  hx-trigger="load, change from:input[name^='score_'], change from:#outcome"
+  hx-include="#workbook-form"
+  hx-swap="outerHTML">
+  <div class="matrix-panel__header">
+    <div>
+      <h3 class="matrix-panel__title">CDSC Suitability Outcome Matrix</h3>
+      <p class="matrix-panel__advisory">The recommendation is advisory only. The assessor must still select the final outcome.</p>
+    </div>
+  </div>
+
+  <div class="matrix-summary">
+    <div class="matrix-summary__item">
+      <span class="matrix-summary__label">Risk Level</span>
+      <strong class="matrix-summary__value">{{if .Recommendation.Ready}}{{.Recommendation.RiskClassification}} ({{.Recommendation.RiskLevel}}){{else}}Pending{{end}}</strong>
+    </div>
+    <div class="matrix-summary__item">
+      <span class="matrix-summary__label">Assurance Level</span>
+      <strong class="matrix-summary__value">{{if .Recommendation.Ready}}{{.Recommendation.AssuranceClassification}} ({{.Recommendation.AssuranceLevel}}){{else}}Pending{{end}}</strong>
+    </div>
+    <div class="matrix-summary__item">
+      <span class="matrix-summary__label">Recommended Outcome</span>
+      <strong class="matrix-summary__value">{{if .Recommendation.Ready}}{{.RecommendedOutcomeTag}}{{else}}Pending{{end}}</strong>
+    </div>
+  </div>
+
+  <div class="matrix-table-wrap">
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th scope="col">Risk \ Assurance</th>
+          {{range .AssuranceHeadings}}<th scope="col">{{.}}</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <th scope="row">{{.Label}}</th>
+          {{range .Cells}}
+          <td class="{{if .Active}}matrix-table__cell--active{{end}}">
+            <span class="matrix-table__outcome">Outcome {{.Outcome}}</span>
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="matrix-reasoning">
+    <span class="matrix-reasoning__label">Reasoning</span>
+    <p>{{.Recommendation.Reasoning}}</p>
+  </div>
+
+  <div class="field field--full">
+    <label for="override_rationale">Override Rationale{{if .Recommendation.OverrideRequired}} <span class="field__required">required</span>{{end}}</label>
+    <textarea id="override_rationale"
+              name="override_rationale"
+              rows="3"
+              {{if .Recommendation.OverrideRequired}}required{{end}}
+              placeholder="Explain why the final selected outcome differs from the advisory recommendation.">{{.OverrideRationale}}</textarea>
+    <p class="field__hint">Only required when the final selected outcome differs from the recommendation.</p>
+    {{if .Recommendation.OverrideRequired}}
+    <p class="field__alert">{{.SelectedOutcomeTag}} differs from {{.RecommendedOutcomeTag}}. Provide an override rationale before generating an attestation.</p>
+    {{end}}
+  </div>
+</div>`
+
 func main() {
 	var err error
 
@@ -93,9 +185,15 @@ func main() {
 		log.Fatalf("failed to parse error template: %v", err)
 	}
 
+	matrixTmpl, err = template.New("matrix").Parse(matrixTemplate)
+	if err != nil {
+		log.Fatalf("failed to parse matrix template: %v", err)
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.HandleFunc("/generate", handleGenerate)
+	mux.HandleFunc("/suitability-matrix", handleSuitabilityMatrix)
 	mux.HandleFunc("/", handleWorkbook)
 
 	port := os.Getenv("PORT")
@@ -122,6 +220,23 @@ func handleWorkbook(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := workbookTmpl.Execute(w, data); err != nil {
 		log.Printf("template error: %v", err)
+	}
+}
+
+func handleSuitabilityMatrix(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	a := buildAssessment(r)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := matrixTmpl.Execute(w, newMatrixResult(a)); err != nil {
+		log.Printf("matrix template render error: %v", err)
 	}
 }
 
@@ -179,6 +294,7 @@ func buildAssessment(r *http.Request) *assessment.WorkbookAssessment {
 		Approver:          strings.TrimSpace(r.FormValue("approver")),
 		AssessmentDate:    strings.TrimSpace(r.FormValue("assessment_date")),
 		Outcome:           strings.TrimSpace(r.FormValue("outcome")),
+		OverrideRationale: strings.TrimSpace(r.FormValue("override_rationale")),
 		RequiredControls:  strings.TrimSpace(r.FormValue("required_controls")),
 		DecisionRationale: strings.TrimSpace(r.FormValue("decision_rationale")),
 	}
@@ -215,6 +331,10 @@ func validate(a *assessment.WorkbookAssessment) []string {
 	if a.Outcome == "" {
 		errs = append(errs, "Suitability Outcome is required.")
 	}
+	rec := assessment.EvaluateSuitability(a)
+	if rec.OverrideRequired && a.OverrideRationale == "" {
+		errs = append(errs, "Override Rationale is required when the selected outcome differs from the advisory recommendation.")
+	}
 
 	for i, def := range assessment.Criteria {
 		if i >= len(a.CriteriaAssessments) {
@@ -231,4 +351,62 @@ func validate(a *assessment.WorkbookAssessment) []string {
 	}
 
 	return errs
+}
+
+func newMatrixResult(a *assessment.WorkbookAssessment) matrixResult {
+	rec := assessment.EvaluateSuitability(a)
+
+	rows := []matrixRow{
+		{
+			Key:   "High",
+			Label: "High Risk",
+			Cells: []matrixCell{
+				{Key: "Low", Outcome: "D"},
+				{Key: "Medium", Outcome: "D"},
+				{Key: "High", Outcome: "C"},
+			},
+		},
+		{
+			Key:   "Medium",
+			Label: "Med Risk",
+			Cells: []matrixCell{
+				{Key: "Low", Outcome: "D"},
+				{Key: "Medium", Outcome: "B"},
+				{Key: "High", Outcome: "B"},
+			},
+		},
+		{
+			Key:   "Low",
+			Label: "Low Risk",
+			Cells: []matrixCell{
+				{Key: "Low", Outcome: "D"},
+				{Key: "Medium", Outcome: "B"},
+				{Key: "High", Outcome: "A"},
+			},
+		},
+	}
+
+	for i := range rows {
+		for j := range rows[i].Cells {
+			rows[i].Cells[j].Active = rec.Ready &&
+				rows[i].Key == rec.RiskClassification &&
+				rows[i].Cells[j].Key == rec.AssuranceClassification
+		}
+	}
+
+	return matrixResult{
+		Recommendation:        rec,
+		OverrideRationale:     a.OverrideRationale,
+		AssuranceHeadings:     []string{"Low", "Med", "High"},
+		Rows:                  rows,
+		RecommendedOutcomeTag: outcomeTag(rec.RecommendedOutcome),
+		SelectedOutcomeTag:    outcomeTag(rec.SelectedOutcome),
+	}
+}
+
+func outcomeTag(outcome string) string {
+	if outcome == "" {
+		return "No outcome selected"
+	}
+	return "Outcome " + outcome
 }

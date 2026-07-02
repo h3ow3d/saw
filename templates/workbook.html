@@ -208,6 +208,20 @@
               </select>
             </div>
 
+            <div id="suitability-matrix"
+                 class="matrix-panel"
+                 hx-post="/suitability-matrix"
+                 hx-trigger="load, change from:input[name^='score_'], change from:#outcome"
+                 hx-include="#workbook-form"
+                 hx-swap="outerHTML">
+              <div class="matrix-panel__header">
+                <div>
+                  <h3 class="matrix-panel__title">CDSC Suitability Outcome Matrix</h3>
+                  <p class="matrix-panel__advisory">Loading the advisory recommendation…</p>
+                </div>
+              </div>
+            </div>
+
             <div class="field field--full">
               <label for="required_controls">Required Controls</label>
               <textarea id="required_controls"
