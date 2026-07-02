@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suitability Assessment Workbook — CDSC</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+
+  <header class="page-header">
+    <div class="page-header__title">Suitability Assessment Workbook</div>
+    <div class="page-header__subtitle">Cross-Domain Supply Chain Assurance (CDSC)</div>
+  </header>
+
+  <main class="page-body">
+    <form id="workbook-form" novalidate>
+
+      <!-- ================================================================
+           Section 1: Artefact Information
+           ================================================================ -->
+      <section class="section">
+        <div class="section__header">
+          <span class="section__number">1</span>
+          <span class="section__title">Artefact Information</span>
+        </div>
+        <div class="section__body">
+          <div class="field-grid">
+
+            <div class="field">
+              <label for="name">Artefact Name</label>
+              <input type="text" id="name" name="name"
+                     placeholder="e.g. my-service" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="repository">Repository</label>
+              <input type="text" id="repository" name="repository"
+                     placeholder="e.g. ghcr.io/org/my-service" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="version">Version</label>
+              <input type="text" id="version" name="version"
+                     placeholder="e.g. v1.2.3" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="digest">Digest</label>
+              <input type="text" id="digest" name="digest"
+                     placeholder="e.g. sha256:abc123…" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="supplier">Supplier</label>
+              <input type="text" id="supplier" name="supplier"
+                     placeholder="e.g. Acme Corp" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="assessor">Assessor</label>
+              <input type="text" id="assessor" name="assessor"
+                     placeholder="Full name" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="approver">Approver</label>
+              <input type="text" id="approver" name="approver"
+                     placeholder="Full name" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="assessment_date">Assessment Date</label>
+              <input type="date" id="assessment_date" name="assessment_date">
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           Section 2: Suitability Assessment
+           ================================================================ -->
+      <section class="section">
+        <div class="section__header">
+          <span class="section__number">2</span>
+          <span class="section__title">Suitability Assessment</span>
+        </div>
+        <div class="section__body">
+          <div class="criteria-list">
+
+            {{range $i, $c := .Criteria}}
+            <div class="criterion">
+              <div class="criterion__header">
+                <span class="criterion__name">{{$c.Name}}</span>
+              </div>
+              <div class="criterion__body">
+
+                <p class="criterion__question">{{$c.Question}}</p>
+
+                <!-- Score selection -->
+                <div class="score-group">
+                  <span class="score-group__label">Score</span>
+                  <div class="score-options">
+                    {{range $c.ScoreDescriptions}}
+                    <div class="score-option score-option--{{.Score}}">
+                      <input type="radio"
+                             id="score_{{$i}}_{{.Score}}"
+                             name="score_{{$i}}"
+                             value="{{.Score}}">
+                      <label class="score-option__label"
+                             for="score_{{$i}}_{{.Score}}">
+                        <span class="score-option__value">{{.Score}}</span>
+                        <span class="score-option__description">{{.Description}}</span>
+                      </label>
+                    </div>
+                    {{end}}
+                  </div>
+                </div>
+
+                <!-- Criterion inputs -->
+                <div class="criterion__inputs">
+
+                  <div class="field field--full">
+                    <label for="finding_{{$i}}">Finding</label>
+                    <textarea id="finding_{{$i}}"
+                              name="finding_{{$i}}"
+                              rows="2"
+                              placeholder="Summarise the assessor's finding for this criterion."></textarea>
+                  </div>
+
+                  <div class="field field--full">
+                    <label for="evidence_{{$i}}">Evidence Reviewed</label>
+                    <textarea id="evidence_{{$i}}"
+                              name="evidence_{{$i}}"
+                              rows="2"
+                              placeholder="List the evidence reviewed (e.g. SBOM, build logs, supplier attestations)."></textarea>
+                  </div>
+
+                  <div class="field field--full">
+                    <div class="confidence-group">
+                      <span class="score-group__label">Confidence</span>
+                      <div class="confidence-options">
+                        <div class="confidence-option">
+                          <input type="radio"
+                                 id="confidence_{{$i}}_low"
+                                 name="confidence_{{$i}}"
+                                 value="Low">
+                          <label class="confidence-option__label"
+                                 for="confidence_{{$i}}_low">Low</label>
+                        </div>
+                        <div class="confidence-option">
+                          <input type="radio"
+                                 id="confidence_{{$i}}_medium"
+                                 name="confidence_{{$i}}"
+                                 value="Medium">
+                          <label class="confidence-option__label"
+                                 for="confidence_{{$i}}_medium">Medium</label>
+                        </div>
+                        <div class="confidence-option">
+                          <input type="radio"
+                                 id="confidence_{{$i}}_high"
+                                 name="confidence_{{$i}}"
+                                 value="High">
+                          <label class="confidence-option__label"
+                                 for="confidence_{{$i}}_high">High</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="field field--full">
+                    <label for="rationale_{{$i}}">Rationale</label>
+                    <textarea id="rationale_{{$i}}"
+                              name="rationale_{{$i}}"
+                              rows="2"
+                              placeholder="Explain the reasoning behind the score and confidence level."></textarea>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+            {{end}}
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           Section 3: Suitability Outcome
+           ================================================================ -->
+      <section class="section">
+        <div class="section__header">
+          <span class="section__number">3</span>
+          <span class="section__title">Suitability Outcome</span>
+        </div>
+        <div class="section__body">
+          <div class="outcome-grid">
+
+            <div class="field field--full">
+              <label for="outcome">Outcome</label>
+              <select id="outcome" name="outcome">
+                <option value="">— Select outcome —</option>
+                {{range .OutcomeOptions}}
+                <option value="{{.Value}}">{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+
+            <div class="field field--full">
+              <label for="required_controls">Required Controls</label>
+              <textarea id="required_controls"
+                        name="required_controls"
+                        rows="3"
+                        placeholder="List any controls required as a condition of promotion (leave blank if none)."></textarea>
+            </div>
+
+            <div class="field field--full">
+              <label for="decision_rationale">Decision Rationale</label>
+              <textarea id="decision_rationale"
+                        name="decision_rationale"
+                        rows="4"
+                        placeholder="Explain the overall assessment decision and any significant considerations."></textarea>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           Section 4: Generate Attestation
+           ================================================================ -->
+      <section class="section">
+        <div class="section__header">
+          <span class="section__number">4</span>
+          <span class="section__title">Generate Attestation</span>
+        </div>
+        <div class="section__body">
+          <div class="generate-section">
+
+            <p style="font-size:13px;color:#374151;">
+              Click <strong>Generate Attestation</strong> to validate the workbook and
+              download a <code>suitability-attestation-{timestamp}.json</code> file
+              suitable for external signing and publication.
+            </p>
+
+            <button type="button"
+                    class="btn-generate"
+                    hx-post="/generate"
+                    hx-include="#workbook-form"
+                    hx-target="#generate-result"
+                    hx-swap="innerHTML">
+              Generate Attestation
+              <span class="htmx-indicator">…</span>
+            </button>
+
+            <div id="generate-result"></div>
+
+          </div>
+        </div>
+      </section>
+
+    </form>
+  </main>
+
+</body>
+</html>
