@@ -38,9 +38,9 @@ type Criterion struct {
 
 // Attestation is the complete CDSC Suitability Attestation object.
 type Attestation struct {
-	Type       string     `json:"type"`
-	Subject    Subject    `json:"subject"`
-	Assessment Assessment `json:"assessment"`
+	Type       string      `json:"type"`
+	Subject    Subject     `json:"subject"`
+	Assessment Assessment  `json:"assessment"`
 	Criteria   []Criterion `json:"criteria"`
 }
 
