@@ -2,6 +2,11 @@
 // eight CDSC suitability criteria.
 package assessment
 
+import (
+	"fmt"
+	"strings"
+)
+
 // ScoreDescription maps a numeric score to its qualitative description.
 type ScoreDescription struct {
 	Score       int
@@ -43,8 +48,26 @@ type WorkbookAssessment struct {
 
 	// Suitability outcome
 	Outcome           string
+	OverrideRationale string
 	RequiredControls  string
 	DecisionRationale string
+}
+
+// SuitabilityRecommendation captures the live outcome recommendation derived
+// from the assessment scores.
+type SuitabilityRecommendation struct {
+	Ready                   bool
+	RiskLevel               int
+	RiskClassification      string
+	RiskCriteria            []string
+	AssuranceLevel          int
+	AssuranceClassification string
+	AssuranceCriteria       []string
+	RecommendedOutcome      string
+	SelectedOutcome         string
+	OverrideRequired        bool
+	MissingCriteria         []string
+	Reasoning               string
 }
 
 // Criteria is the ordered list of eight CDSC suitability assessment criteria.
@@ -148,4 +171,144 @@ var OutcomeOptions = []struct {
 	{"B", "Outcome B — Suitable with Additional Controls"},
 	{"C", "Outcome C — Hybrid Treatment Required"},
 	{"D", "Outcome D — Higher-Assurance Treatment Required"},
+}
+
+var riskCriterionIndexes = []int{0, 1, 5, 6}
+var assuranceCriterionIndexes = []int{2, 3, 4, 7}
+
+// EvaluateSuitability calculates the advisory suitability recommendation from
+// the current assessment scores.
+func EvaluateSuitability(a *WorkbookAssessment) SuitabilityRecommendation {
+	rec := SuitabilityRecommendation{
+		Reasoning: "Complete the Section 2 scores to view the advisory recommendation.",
+	}
+	if a == nil {
+		return rec
+	}
+
+	rec.SelectedOutcome = a.Outcome
+
+	riskLevel, riskCriteria, missingRisk := evaluateHighest(a.CriteriaAssessments, riskCriterionIndexes)
+	assuranceLevel, assuranceCriteria, missingAssurance := evaluateLowest(a.CriteriaAssessments, assuranceCriterionIndexes)
+	rec.MissingCriteria = append(missingRisk, missingAssurance...)
+	if len(rec.MissingCriteria) > 0 {
+		rec.Reasoning = fmt.Sprintf(
+			"Complete scores for %s to calculate the advisory recommendation.",
+			strings.Join(rec.MissingCriteria, ", "),
+		)
+		return rec
+	}
+
+	rec.Ready = true
+	rec.RiskLevel = riskLevel
+	rec.RiskCriteria = riskCriteria
+	rec.RiskClassification = classifyLevel(riskLevel)
+	rec.AssuranceLevel = assuranceLevel
+	rec.AssuranceCriteria = assuranceCriteria
+	rec.AssuranceClassification = classifyLevel(assuranceLevel)
+	rec.RecommendedOutcome = recommendOutcome(rec.RiskClassification, rec.AssuranceClassification)
+	rec.OverrideRequired = rec.SelectedOutcome != "" && rec.SelectedOutcome != rec.RecommendedOutcome
+	rec.Reasoning = fmt.Sprintf(
+		"Highest risk score is %d (%s), giving %s risk. Lowest assurance score is %d (%s), giving %s assurance. %s risk with %s assurance recommends Outcome %s.",
+		rec.RiskLevel,
+		strings.Join(rec.RiskCriteria, ", "),
+		rec.RiskClassification,
+		rec.AssuranceLevel,
+		strings.Join(rec.AssuranceCriteria, ", "),
+		rec.AssuranceClassification,
+		strings.ToLower(rec.RiskClassification),
+		strings.ToLower(rec.AssuranceClassification),
+		rec.RecommendedOutcome,
+	)
+
+	return rec
+}
+
+func evaluateHighest(criteria []CriterionAssessment, indexes []int) (int, []string, []string) {
+	var (
+		level   int
+		matches []string
+		missing []string
+	)
+
+	for _, idx := range indexes {
+		if idx >= len(criteria) || criteria[idx].Score < 1 || criteria[idx].Score > 5 {
+			missing = append(missing, Criteria[idx].Name)
+			continue
+		}
+
+		score := criteria[idx].Score
+		switch {
+		case score > level:
+			level = score
+			matches = []string{Criteria[idx].Name}
+		case score == level:
+			matches = append(matches, Criteria[idx].Name)
+		}
+	}
+
+	return level, matches, missing
+}
+
+func evaluateLowest(criteria []CriterionAssessment, indexes []int) (int, []string, []string) {
+	var (
+		level   int
+		matches []string
+		missing []string
+	)
+
+	for _, idx := range indexes {
+		if idx >= len(criteria) || criteria[idx].Score < 1 || criteria[idx].Score > 5 {
+			missing = append(missing, Criteria[idx].Name)
+			continue
+		}
+
+		score := criteria[idx].Score
+		switch {
+		case level == 0 || score < level:
+			level = score
+			matches = []string{Criteria[idx].Name}
+		case score == level:
+			matches = append(matches, Criteria[idx].Name)
+		}
+	}
+
+	return level, matches, missing
+}
+
+func classifyLevel(score int) string {
+	switch {
+	case score <= 2:
+		return "Low"
+	case score == 3:
+		return "Medium"
+	default:
+		return "High"
+	}
+}
+
+func recommendOutcome(risk, assurance string) string {
+	switch risk {
+	case "High":
+		if assurance == "High" {
+			return "C"
+		}
+		return "D"
+	case "Medium":
+		if assurance == "Low" {
+			return "D"
+		}
+		return "B"
+	case "Low":
+		switch assurance {
+		case "High":
+			return "A"
+		case "Medium":
+			return "B"
+		default:
+			return "D"
+		}
+	default:
+		return ""
+	}
 }

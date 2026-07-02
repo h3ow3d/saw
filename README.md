@@ -8,7 +8,7 @@ An assessor uses the workbook to:
 1. Describe an artefact (name, repository, version, digest, supplier).
 2. Assess the artefact against eight defined suitability criteria.
 3. Record evidence, findings, confidence levels and rationale per criterion.
-4. Determine a suitability outcome (A–D).
+4. Review the live CDSC suitability matrix recommendation and determine a final suitability outcome (A–D).
 5. Generate and download a **CDSC Suitability Attestation** as JSON.
 
 ## Technology
@@ -70,6 +70,7 @@ JSON file named `suitability-attestation-{timestamp}.json`:
     "approver": "",
     "assessmentDate": "",
     "outcome": "",
+    "overrideRationale": "",
     "decisionRationale": "",
     "requiredControls": ""
   },
@@ -85,6 +86,15 @@ JSON file named `suitability-attestation-{timestamp}.json`:
   ]
 }
 ```
+
+The workbook computes a live advisory recommendation from the Section 2 scores:
+
+- **Risk Level** uses the highest of Sensitivity, Privilege, Operational Impact
+  and Recoverability.
+- **Assurance Level** uses the lowest of Provenance, Verifiability,
+  Traceability and Supply Chain Assurance.
+- If the final selected outcome differs from the advisory recommendation, an
+  **Override Rationale** is required before attestation generation.
 
 The attestation is intended for external signing and publication and is not
 stored by this application.

@@ -21,6 +21,7 @@ type Assessment struct {
 	Approver          string `json:"approver"`
 	AssessmentDate    string `json:"assessmentDate"`
 	Outcome           string `json:"outcome"`
+	OverrideRationale string `json:"overrideRationale"`
 	DecisionRationale string `json:"decisionRationale"`
 	RequiredControls  string `json:"requiredControls"`
 }
@@ -37,9 +38,9 @@ type Criterion struct {
 
 // Attestation is the complete CDSC Suitability Attestation object.
 type Attestation struct {
-	Type       string     `json:"type"`
-	Subject    Subject    `json:"subject"`
-	Assessment Assessment `json:"assessment"`
+	Type       string      `json:"type"`
+	Subject    Subject     `json:"subject"`
+	Assessment Assessment  `json:"assessment"`
 	Criteria   []Criterion `json:"criteria"`
 }
 
@@ -75,6 +76,7 @@ func Generate(a *assessment.WorkbookAssessment) Attestation {
 			Approver:          a.Approver,
 			AssessmentDate:    a.AssessmentDate,
 			Outcome:           a.Outcome,
+			OverrideRationale: a.OverrideRationale,
 			DecisionRationale: a.DecisionRationale,
 			RequiredControls:  a.RequiredControls,
 		},

@@ -18,6 +18,7 @@ func fullAssessment() *assessment.WorkbookAssessment {
 		Approver:          "Bob Jones",
 		AssessmentDate:    "2026-07-02",
 		Outcome:           "B",
+		OverrideRationale: "Approved due to compensating control review",
 		RequiredControls:  "Image must be signed",
 		DecisionRationale: "Acceptable with controls",
 	}
@@ -77,6 +78,9 @@ func TestGenerateAssessment(t *testing.T) {
 	}
 	if att.Assessment.Outcome != a.Outcome {
 		t.Errorf("Assessment.Outcome = %q, want %q", att.Assessment.Outcome, a.Outcome)
+	}
+	if att.Assessment.OverrideRationale != a.OverrideRationale {
+		t.Errorf("Assessment.OverrideRationale = %q, want %q", att.Assessment.OverrideRationale, a.OverrideRationale)
 	}
 	if att.Assessment.RequiredControls != a.RequiredControls {
 		t.Errorf("Assessment.RequiredControls = %q, want %q", att.Assessment.RequiredControls, a.RequiredControls)
